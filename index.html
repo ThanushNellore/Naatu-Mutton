@@ -59,6 +59,7 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       border: 1px solid #e0e0e0;
       transition: transform 0.2s;
+      position: relative;
     }
     .card:hover {
       transform: scale(1.03);
@@ -75,6 +76,16 @@
     .card p {
       margin: 10px;
       font-size: 0.95em;
+    }
+    .quantity {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: #7d1c1c;
+      color: white;
+      border-radius: 50%;
+      padding: 5px 10px;
+      font-size: 0.9em;
     }
     button {
       background-color: #561313;
@@ -122,7 +133,7 @@
       display: none;
       padding: 20px;
     }
-    .summary-page input {
+    .summary-page input, .summary-page select {
       width: 100%;
       padding: 10px;
       margin: 10px 0;
@@ -154,6 +165,12 @@
   <div class="summary-page" id="summary">
     <h3>Order Summary</h3>
     <div id="cart-summary"></div>
+    <select id="delivery-location">
+      <option value="">Select Delivery Location</option>
+      <option value="Nellore">Nellore</option>
+      <option value="Kavali">Kavali</option>
+      <option value="Buchi">Buchi</option>
+    </select>
     <input type="text" id="phone" placeholder="Enter your phone number" required />
     <div class="location-box">
       <button onclick="sendOrderToSheet()">📍 Submit Order with Location</button>
@@ -176,53 +193,67 @@
       { name: "Raw Mutton", price: 800, img: "https://source.unsplash.com/200x140/?raw,mutton" }
     ];
 
-    const cart = [];
+    const cart = {};
     const container = document.getElementById('product-list');
     const summaryDiv = document.getElementById('cart-summary');
 
     products.forEach((p, i) => {
       const div = document.createElement('div');
       div.className = 'card';
-      div.innerHTML = `<img src="${p.img}" /><p><strong>${p.name}</strong><br>₹${p.price}</p><button onclick="addToCart(this, ${i})">Add to Cart</button>`;
+      div.innerHTML = `<img src="${p.img}" /><p><strong>${p.name}</strong><br>₹${p.price}</p><span class="quantity" id="qty-${i}" style="display:none">1</span><button onclick="addToCart(this, ${i})">Add to Cart</button>`;
       container.appendChild(div);
     });
 
     function addToCart(button, index) {
-      cart.push(products[index]);
+      if (!cart[index]) {
+        cart[index] = { ...products[index], quantity: 1 };
+      } else {
+        cart[index].quantity++;
+      }
+      const qtySpan = document.getElementById(`qty-${index}`);
+      qtySpan.innerText = cart[index].quantity;
+      qtySpan.style.display = 'inline';
       button.closest('.card').classList.add('selected');
     }
 
     function reviewOrder() {
-      if (cart.length === 0) {
+      if (Object.keys(cart).length === 0) {
         alert("Please select at least one item to proceed.");
         return;
       }
       document.querySelector('.products').style.display = 'none';
       document.querySelector('.location-box').style.display = 'none';
-      const summary = cart.map(p => `<p>${p.name} - ₹${p.price}</p>`).join('');
-      const total = cart.reduce((sum, p) => sum + p.price, 0);
+      let summary = '';
+      let total = 0;
+      for (let key in cart) {
+        const item = cart[key];
+        summary += `<p>${item.name} x ${item.quantity} - ₹${item.price * item.quantity}</p>`;
+        total += item.price * item.quantity;
+      }
       summaryDiv.innerHTML = summary + `<hr><strong>Total: ₹${total}</strong>`;
       document.getElementById('summary').style.display = 'block';
     }
 
     function sendOrderToSheet() {
       const phone = document.getElementById("phone").value.trim();
+      const location = document.getElementById("delivery-location").value;
+      if (!location) {
+        alert("Please select a delivery location.");
+        return;
+      }
       if (!phone) {
         alert("Please enter your phone number.");
         return;
       }
-      if (!/^\d{10}$/.test(phone)) {
-        alert("Invalid phone number. Please enter a 10-digit number.");
-        return;
-      }
-      if (!navigator.geolocation) {
-        alert("Geolocation not supported");
+      if (!/^[6-9]\d{9}$/.test(phone)) {
+        alert("Invalid phone number. Please enter a valid 10-digit Indian number.");
         return;
       }
       document.getElementById('status').innerText = "Sending your order...";
       navigator.geolocation.getCurrentPosition((position) => {
-        const items = cart.map(p => `${p.name} (₹${p.price})`).join(", ");
-        const url = `https://docs.google.com/forms/d/e/1FAIpQLSec9RXfUL31tRAtkpPzO5FTgB-Mt7HTGVpDokS2nbT_A7tEzQ/formResponse?entry.1691012188=${encodeURIComponent(items)}&entry.2077435067=${position.coords.latitude},${position.coords.longitude}&entry.755137674=${encodeURIComponent(phone)}`;
+        const items = Object.values(cart).map(p => `${p.name} x${p.quantity} (₹${p.price * p.quantity})`).join(", ");
+        const total = Object.values(cart).reduce((sum, p) => sum + p.price * p.quantity, 0);
+        const url = `https://docs.google.com/forms/d/e/1FAIpQLSec9RXfUL31tRAtkpPzO5FTgB-Mt7HTGVpDokS2nbT_A7tEzQ/formResponse?entry.1691012188=${encodeURIComponent(items)}&entry.2077435067=${position.coords.latitude},${position.coords.longitude}&entry.755137674=${encodeURIComponent(phone)}&entry.998775233=${encodeURIComponent(location)}&entry.282885649=${total}`;
         fetch(url, { method: 'POST', mode: 'no-cors' });
         document.getElementById('status').innerText = "Order sent! You’ll get a call soon.";
         showPopup();
