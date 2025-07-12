@@ -6,6 +6,7 @@
   <title>FreshMutton - ప్రేష్ మటన్</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
   <style>
+    /* styles unchanged */
     body {
       font-family: 'Roboto', sans-serif;
       margin: 0;
@@ -181,7 +182,6 @@
   <div class="location-box">
     <button onclick="reviewOrder()">Next</button>
   </div>
-
   <div class="summary-page" id="summary">
     <h3>Order Summary</h3>
     <div id="cart-summary"></div>
@@ -202,7 +202,18 @@
     <p><strong>✅ Your order was submitted successfully!</strong></p>
   </div>
   <script>
-    const products = [...]; // Keep existing product array
+    const products = [
+      { name: "Mutton Boti", price: 300, img: "https://source.unsplash.com/200x140/?mutton,boti" },
+      { name: "Mutton Legs (Paya)", price: 225, img: "https://source.unsplash.com/200x140/?mutton,legs" },
+      { name: "Mutton Brain", price: 225, img: "https://source.unsplash.com/200x140/?mutton,brain" },
+      { name: "Mutton Kidney", price: 270, img: "https://source.unsplash.com/200x140/?mutton,kidney" },
+      { name: "Mutton Liver", price: 250, img: "https://source.unsplash.com/200x140/?mutton,liver" },
+      { name: "Mutton Keema", price: 950, img: "https://source.unsplash.com/200x140/?mutton,keema" },
+      { name: "Mutton Boneless", price: 900, img: "https://source.unsplash.com/200x140/?mutton,boneless" },
+      { name: "Mutton Curry Cut", price: 800, img: "https://source.unsplash.com/200x140/?mutton,currycut" },
+      { name: "Raw Mutton", price: 800, img: "https://source.unsplash.com/200x140/?raw,mutton" }
+    ];
+
     const cart = JSON.parse(localStorage.getItem('cart') || '{}');
     const container = document.getElementById('product-list');
     const summaryDiv = document.getElementById('cart-summary');
