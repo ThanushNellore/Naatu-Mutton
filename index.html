@@ -63,6 +63,10 @@
     .card:hover {
       transform: scale(1.03);
     }
+    .card.selected {
+      border: 2px solid #7d1c1c;
+      background-color: #ffeeee;
+    }
     .card img {
       width: 100%;
       height: 120px;
@@ -92,12 +96,6 @@
       margin: 20px;
       text-align: center;
     }
-    .location-box button {
-      background-color: #214321;
-      padding: 12px 20px;
-      border-radius: 8px;
-      font-size: 1em;
-    }
     #status {
       margin-top: 10px;
       font-size: 0.9em;
@@ -120,6 +118,17 @@
     .popup.show {
       display: block;
     }
+    .summary-page {
+      display: none;
+      padding: 20px;
+    }
+    .summary-page input {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
     @media (max-width: 480px) {
       .products {
         grid-template-columns: 1fr;
@@ -139,8 +148,17 @@
   <div class="notice-box">🎉 Order now and enjoy our best quality cuts every Sunday morning!</div>
   <div class="products" id="product-list"></div>
   <div class="location-box">
-    <button onclick="sendOrderToSheet()">📍 Send Order + Location</button>
-    <p id="status"></p>
+    <button onclick="reviewOrder()">Next</button>
+  </div>
+
+  <div class="summary-page" id="summary">
+    <h3>Order Summary</h3>
+    <div id="cart-summary"></div>
+    <input type="text" id="phone" placeholder="Enter your phone number" required />
+    <div class="location-box">
+      <button onclick="sendOrderToSheet()">📍 Submit Order with Location</button>
+      <p id="status"></p>
+    </div>
   </div>
   <div class="popup" id="popup">
     <p><strong>✅ Your order was submitted successfully!</strong></p>
@@ -160,16 +178,31 @@
 
     const cart = [];
     const container = document.getElementById('product-list');
+    const summaryDiv = document.getElementById('cart-summary');
+
     products.forEach((p, i) => {
       const div = document.createElement('div');
       div.className = 'card';
-      div.innerHTML = `<img src="${p.img}" /><p><strong>${p.name}</strong><br>₹${p.price}</p><button onclick="addToCart(${i})">Add to Cart</button>`;
+      div.innerHTML = `<img src="${p.img}" /><p><strong>${p.name}</strong><br>₹${p.price}</p><button onclick="addToCart(this, ${i})">Add to Cart</button>`;
       container.appendChild(div);
     });
 
-    function addToCart(index) {
+    function addToCart(button, index) {
       cart.push(products[index]);
-      alert(`${products[index].name} added to cart.`);
+      button.closest('.card').classList.add('selected');
+    }
+
+    function reviewOrder() {
+      if (cart.length === 0) {
+        alert("Please select at least one item to proceed.");
+        return;
+      }
+      document.querySelector('.products').style.display = 'none';
+      document.querySelector('.location-box').style.display = 'none';
+      const summary = cart.map(p => `<p>${p.name} - ₹${p.price}</p>`).join('');
+      const total = cart.reduce((sum, p) => sum + p.price, 0);
+      summaryDiv.innerHTML = summary + `<hr><strong>Total: ₹${total}</strong>`;
+      document.getElementById('summary').style.display = 'block';
     }
 
     function sendOrderToSheet() {
@@ -177,10 +210,15 @@
         alert("Geolocation not supported");
         return;
       }
+      const phone = document.getElementById("phone").value;
+      if (!phone) {
+        alert("Please enter your phone number.");
+        return;
+      }
       document.getElementById('status').innerText = "Sending your order...";
       navigator.geolocation.getCurrentPosition((position) => {
         const items = cart.map(p => `${p.name} (₹${p.price})`).join(", ");
-        const url = `https://docs.google.com/forms/d/e/1FAIpQLSec9RXfUL31tRAtkpPzO5FTgB-Mt7HTGVpDokS2nbT_A7tEzQ/formResponse?entry.1691012188=${encodeURIComponent(items)}&entry.2077435067=${position.coords.latitude},${position.coords.longitude}`;
+        const url = `https://docs.google.com/forms/d/e/1FAIpQLSec9RXfUL31tRAtkpPzO5FTgB-Mt7HTGVpDokS2nbT_A7tEzQ/formResponse?entry.1691012188=${encodeURIComponent(items)}&entry.2077435067=${position.coords.latitude},${position.coords.longitude}&entry.755137674=${encodeURIComponent(phone)}`;
         fetch(url, { method: 'POST', mode: 'no-cors' });
         document.getElementById('status').innerText = "Order sent! You’ll get a call soon.";
         showPopup();
