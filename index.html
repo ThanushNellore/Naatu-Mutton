@@ -72,20 +72,9 @@
       box-shadow: 0 2px 8px rgba(0,0,0,0.1);
       border: 1px solid #e0e0e0;
       transition: transform 0.2s;
-      position: relative;
-      opacity: 1;
     }
     .card:hover {
       transform: scale(1.03);
-    }
-    .card.selected {
-      border: 2px solid #7d1c1c;
-      background-color: #ffeeee;
-    }
-    .card.out-of-stock {
-      background-color: #ffe5e5;
-      pointer-events: none;
-      opacity: 0.6;
     }
     .card img {
       width: 100%;
@@ -96,10 +85,6 @@
       margin: 10px;
       font-size: 0.95em;
     }
-    .subtotal {
-      font-size: 0.85em;
-      color: #444;
-    }
     .quantity-controls {
       display: flex;
       justify-content: center;
@@ -108,25 +93,8 @@
       margin-bottom: 10px;
     }
     .quantity-controls button {
-      width: auto;
       padding: 5px 10px;
       font-size: 1em;
-    }
-    button {
-      background-color: #561313;
-      color: white;
-      border: none;
-      padding: 10px;
-      width: 90%;
-      margin-bottom: 10px;
-      border-radius: 5px;
-      cursor: pointer;
-      font-size: 0.95em;
-      transition: transform 0.2s, background-color 0.3s;
-    }
-    button:hover {
-      transform: scale(1.05);
-      background-color: #6e1a1a;
     }
     .location-box {
       margin: 20px;
@@ -165,12 +133,20 @@
       border: 1px solid #ccc;
       border-radius: 5px;
     }
+    button {
+      background-color: #561313;
+      color: white;
+      border: none;
+      padding: 10px;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #6e1a1a;
+    }
     @media (max-width: 480px) {
       .products {
         grid-template-columns: 1fr;
-      }
-      header h1 {
-        font-size: 1.5em;
       }
     }
   </style>
@@ -243,21 +219,19 @@
     function renderProducts() {
       container.innerHTML = '';
       products.forEach((p, i) => {
-        const stock = stockMap[i] || 0;
+        const stock = stockMap[i] || 10;
         const qty = cart[i]?.quantity || 0;
         const isOut = stock === 0;
-        const oneLeft = stock - qty === 1;
 
         const div = document.createElement('div');
-        div.className = 'card' + (qty > 0 ? ' selected' : '') + (isOut ? ' out-of-stock' : '');
+        div.className = 'card';
         div.innerHTML = `
           <img src="${p.img}" />
           <p><strong>${p.name}</strong><br>₹${p.price}</p>
-          <p class="subtotal" id="subtotal-${i}">${qty > 0 ? `Subtotal: ₹${qty * p.price}` : (isOut ? 'Out of stock' : '')}</p>
-          ${oneLeft ? '<p style="color:red;font-weight:bold;">Only 1 left!</p>' : ''}
+          <p class="subtotal">${qty > 0 ? `Subtotal: ₹${qty * p.price}` : ''}</p>
           <div class="quantity-controls">
             <button onclick="changeQty(${i}, -1)">-</button>
-            <span id="qty-${i}">${qty}</span>
+            <span>${qty}</span>
             <button onclick="changeQty(${i}, 1)" ${qty >= stock ? 'disabled' : ''}>+</button>
           </div>
         `;
@@ -267,10 +241,7 @@
     }
 
     function reviewOrder() {
-      const name = document.getElementById("customer-name").value.trim();
-      if (!name) return alert("Please enter your name.");
-      if (Object.keys(cart).length === 0) return alert("Please select at least one item to proceed.");
-
+      if (Object.keys(cart).length === 0) return alert("Please select items to proceed.");
       document.querySelector('.products').style.display = 'none';
       document.querySelector('.location-box').style.display = 'none';
       document.getElementById('summary').style.display = 'block';
