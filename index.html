@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FreshMutton - ప్రేష్ మటన్</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/tabletop@1.6.4/tabletop.min.js"></script>
   <style>
     body {
       font-family: 'Roboto', sans-serif;
@@ -60,7 +59,7 @@
     }
     .products {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      grid-template-columns: 1fr 1fr;
       gap: 15px;
       padding: 20px;
     }
@@ -77,10 +76,9 @@
     .card:hover {
       transform: scale(1.03);
     }
-    .card.out-of-stock {
-      background-color: #ffe5e5;
-      pointer-events: none;
-      opacity: 0.6;
+    .card.selected {
+      border: 2px solid #7d1c1c;
+      background-color: #ffeeee;
     }
     .card img {
       width: 100%;
@@ -91,6 +89,10 @@
       margin: 10px;
       font-size: 0.95em;
     }
+    .subtotal {
+      font-size: 0.85em;
+      color: #444;
+    }
     .quantity-controls {
       display: flex;
       justify-content: center;
@@ -99,17 +101,70 @@
       margin-bottom: 10px;
     }
     .quantity-controls button {
+      width: auto;
       padding: 5px 10px;
       font-size: 1em;
-      background-color: #7d1c1c;
+    }
+    button {
+      background-color: #561313;
       color: white;
       border: none;
-      border-radius: 4px;
+      padding: 10px;
+      width: 90%;
+      margin-bottom: 10px;
+      border-radius: 5px;
       cursor: pointer;
+      font-size: 0.95em;
+      transition: transform 0.2s, background-color 0.3s;
     }
-    .quantity-controls span {
-      min-width: 20px;
-      display: inline-block;
+    button:hover {
+      transform: scale(1.05);
+      background-color: #6e1a1a;
+    }
+    .location-box {
+      margin: 20px;
+      text-align: center;
+    }
+    #status {
+      margin-top: 10px;
+      font-size: 0.9em;
+      color: #214321;
+    }
+    .popup {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: #fff;
+      border: 2px solid #7d1c1c;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      display: none;
+      z-index: 1000;
+      text-align: center;
+    }
+    .popup.show {
+      display: block;
+    }
+    .summary-page {
+      display: none;
+      padding: 20px;
+    }
+    .summary-page input, .summary-page select {
+      width: 100%;
+      padding: 10px;
+      margin: 10px 0;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    @media (max-width: 480px) {
+      .products {
+        grid-template-columns: 1fr;
+      }
+      header h1 {
+        font-size: 1.5em;
+      }
     }
   </style>
 </head>
@@ -122,9 +177,30 @@
   <div class="hero">Fresh Naatu Mutton Delivered to Your Doorstep</div>
   <div class="notice-box">🎉 Order now and enjoy our best quality cuts every Sunday morning!</div>
   <div class="products" id="product-list"></div>
-
+  <div class="location-box">
+    <button onclick="reviewOrder()">Next</button>
+  </div>
+  <div class="summary-page" id="summary">
+    <h3>Order Summary</h3>
+    <div id="cart-summary"></div>
+    <select id="delivery-location">
+      <option value="">Select Delivery Location</option>
+      <option value="Nellore">Nellore</option>
+      <option value="Kavali">Kavali</option>
+      <option value="Buchi">Buchi</option>
+    </select>
+    <input type="text" id="phone" placeholder="Enter your phone number" required />
+    <div class="location-box">
+      <button onclick="sendOrderToSheet()">📍 Submit Order with Location</button>
+      <button onclick="goBackToProducts()">🔙 Back</button>
+      <p id="status"></p>
+    </div>
+  </div>
+  <div class="popup" id="popup">
+    <p><strong>✅ Your order was submitted successfully!</strong></p>
+  </div>
   <script>
-    const stockMap = {};
+    const EXPIRY_HOURS = 3;
     const products = [
       { name: "Mutton Boti", price: 300, img: "https://source.unsplash.com/200x140/?mutton,boti" },
       { name: "Mutton Legs (Paya)", price: 225, img: "https://source.unsplash.com/200x140/?mutton,legs" },
@@ -137,8 +213,17 @@
       { name: "Raw Mutton", price: 800, img: "https://source.unsplash.com/200x140/?raw,mutton" }
     ];
 
-    let cart = {};
+    let stored = JSON.parse(localStorage.getItem('cartState') || '{}');
+    let cart = stored.data || {};
+
+    // Check expiry
+    if (stored.timestamp && Date.now() - stored.timestamp > EXPIRY_HOURS * 60 * 60 * 1000) {
+      cart = {};
+      localStorage.removeItem('cartState');
+    }
+
     const container = document.getElementById('product-list');
+    const summaryDiv = document.getElementById('cart-summary');
     const cartPreview = document.getElementById('live-cart');
 
     function updateCartPreview() {
@@ -146,56 +231,94 @@
       cartPreview.innerText = `Cart: ₹${total}`;
     }
 
-    function changeQty(index, delta) {
-      if (!cart[index]) cart[index] = { ...products[index], quantity: 0 };
-      if ((cart[index].quantity + delta) <= stockMap[index]) {
-        cart[index].quantity += delta;
-        if (cart[index].quantity <= 0) delete cart[index];
-        renderProducts();
-      }
+    function saveCart() {
+      localStorage.setItem('cartState', JSON.stringify({
+        data: cart,
+        timestamp: Date.now()
+      }));
     }
 
     function renderProducts() {
       container.innerHTML = '';
       products.forEach((p, i) => {
-        const stock = stockMap[i] || 0;
         const qty = cart[i]?.quantity || 0;
-        const isOut = stock === 0;
-        const oneLeft = stock - qty === 1;
-
         const div = document.createElement('div');
-        div.className = 'card' + (qty > 0 ? ' selected' : '') + (isOut ? ' out-of-stock' : '');
+        div.className = 'card' + (qty > 0 ? ' selected' : '');
         div.innerHTML = `
           <img src="${p.img}" />
           <p><strong>${p.name}</strong><br>₹${p.price}</p>
-          <p class="subtotal" id="subtotal-${i}">${qty > 0 ? `Subtotal: ₹${qty * p.price}` : (isOut ? 'Out of stock' : '')}</p>
-          ${oneLeft ? '<p style="color:red;font-weight:bold;">Only 1 left!</p>' : ''}
+          <p class="subtotal" id="subtotal-${i}">${qty > 0 ? `Subtotal: ₹${qty * p.price}` : ''}</p>
           <div class="quantity-controls">
             <button onclick="changeQty(${i}, -1)">-</button>
             <span id="qty-${i}">${qty}</span>
-            <button onclick="changeQty(${i}, 1)" ${qty >= stock ? 'disabled' : ''}>+</button>
+            <button onclick="changeQty(${i}, 1)">+</button>
           </div>
         `;
         container.appendChild(div);
       });
       updateCartPreview();
+      saveCart();
     }
 
-    Tabletop.init({
-      key: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQNn-pH_cNy6NLP-kl1wEQc5W72grhlbyqZSSijmQktIB0z2GPzOKfwWQIqUzDHl1cA_sP_8mMMQwjm/pubhtml?gid=0&single=true',
-      callback: function(data) {
-  console.log('Fetched sheet data:', data); // ✅ Add this line
-  data.forEach(row => {
-    const index = parseInt(row.Index);
-    const stock = parseInt(row.Stock);
-    if (!isNaN(index) && !isNaN(stock)) stockMap[index] = stock;
-  });
-  console.log('Mapped stock data:', stockMap); // ✅ Add this line
-  renderProducts();
-}
-,
-      simpleSheet: true
-    });
+    function changeQty(index, delta) {
+      if (!cart[index]) cart[index] = { ...products[index], quantity: 0 };
+      cart[index].quantity += delta;
+      if (cart[index].quantity <= 0) delete cart[index];
+      renderProducts();
+    }
+
+    function reviewOrder() {
+      if (Object.keys(cart).length === 0) {
+        alert("Please select at least one item to proceed.");
+        return;
+      }
+      document.querySelector('.products').style.display = 'none';
+      document.querySelector('.location-box').style.display = 'none';
+      document.getElementById('summary').style.display = 'block';
+      let summary = '';
+      let total = 0;
+      for (let key in cart) {
+        const item = cart[key];
+        summary += `<p>${item.name} x ${item.quantity} - ₹${item.price * item.quantity}</p>`;
+        total += item.price * item.quantity;
+      }
+      summaryDiv.innerHTML = summary + `<hr><strong>Total: ₹${total}</strong>`;
+    }
+
+    function goBackToProducts() {
+      document.getElementById('summary').style.display = 'none';
+      document.querySelector('.products').style.display = 'grid';
+      document.querySelector('.location-box').style.display = 'block';
+    }
+
+    function sendOrderToSheet() {
+      const phone = document.getElementById("phone").value.trim();
+      const location = document.getElementById("delivery-location").value;
+      if (!location || !/^[6-9]\d{9}$/.test(phone)) {
+        alert("Please enter valid delivery location and phone number.");
+        return;
+      }
+      document.getElementById('status').innerText = "Sending your order...";
+      navigator.geolocation.getCurrentPosition(position => {
+        const items = Object.values(cart).map(p => `${p.name} x${p.quantity} (₹${p.price * p.quantity})`).join(", ");
+        const total = Object.values(cart).reduce((sum, p) => sum + p.price * p.quantity, 0);
+        const url = `https://docs.google.com/forms/d/e/1FAIpQLSec9RXfUL31tRAtkpPzO5FTgB-Mt7HTGVpDokS2nbT_A7tEzQ/formResponse?entry.1691012188=${encodeURIComponent(items)}&entry.2077435067=${position.coords.latitude},${position.coords.longitude}&entry.755137674=${encodeURIComponent(phone)}&entry.998775233=${encodeURIComponent(location)}&entry.282885649=${total}`;
+        fetch(url, { method: 'POST', mode: 'no-cors' });
+        document.getElementById('status').innerText = "Order sent! You’ll get a call soon.";
+        showPopup();
+      });
+    }
+
+    function showPopup() {
+      document.getElementById('popup').classList.add('show');
+      setTimeout(() => {
+        document.getElementById('popup').classList.remove('show');
+        localStorage.removeItem('cartState');
+        window.location.reload();
+      }, 3000);
+    }
+
+    renderProducts();
   </script>
 </body>
 </html>
