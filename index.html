@@ -256,6 +256,31 @@
       renderProducts();
     }
 
+    function reviewOrder() {
+      if (Object.keys(cart).length === 0) {
+        alert("Please select at least one item to proceed.");
+        return;
+      }
+      document.querySelector('.products').style.display = 'none';
+      document.querySelector('.location-box').style.display = 'none';
+      document.getElementById('summary').style.display = 'block';
+
+      let summary = '';
+      let total = 0;
+      for (let key in cart) {
+        const item = cart[key];
+        summary += `<p>${item.name} x ${item.quantity} - ₹${item.price * item.quantity}</p>`;
+        total += item.price * item.quantity;
+      }
+      summaryDiv.innerHTML = summary + `<hr><strong>Total: ₹${total}</strong>`;
+    }
+
+    function goBackToProducts() {
+      document.getElementById('summary').style.display = 'none';
+      document.querySelector('.products').style.display = 'grid';
+      document.querySelector('.location-box').style.display = 'block';
+    }
+
     window.onload = renderProducts;
   </script>
 </body>
