@@ -18,6 +18,7 @@
       padding: 30px 20px 20px;
       text-align: center;
       border-bottom: 3px solid #7d1c1c;
+      position: relative;
     }
     header img {
       height: 120px;
@@ -28,6 +29,17 @@
       margin: 0;
       font-weight: bold;
       color: #7d1c1c;
+    }
+    .cart-preview {
+      position: absolute;
+      top: 15px;
+      right: 20px;
+      font-size: 0.9em;
+      background: #ffefef;
+      color: #7d1c1c;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-weight: bold;
     }
     .hero {
       background-color: #fff7f7;
@@ -76,6 +88,11 @@
     .card p {
       margin: 10px;
       font-size: 0.95em;
+    }
+    .subtotal {
+      margin-top: -5px;
+      font-size: 0.85em;
+      color: #444;
     }
     .quantity-controls {
       display: flex;
@@ -156,6 +173,7 @@
   <header>
     <img src="https://cdn-icons-png.flaticon.com/512/616/616408.png" alt="FreshMutton Logo">
     <h1>FreshMutton<br>ప్రేష్ మటన్</h1>
+    <div class="cart-preview" id="live-cart">Cart: ₹0</div>
   </header>
   <div class="hero">Fresh Naatu Mutton Delivered to Your Doorstep</div>
   <div class="notice-box">🎉 Order now and enjoy our best quality cuts every Sunday morning!</div>
@@ -184,108 +202,50 @@
     <p><strong>✅ Your order was submitted successfully!</strong></p>
   </div>
   <script>
-    const products = [
-      { name: "Mutton Boti", price: 300, img: "https://source.unsplash.com/200x140/?mutton,boti" },
-      { name: "Mutton Legs (Paya)", price: 225, img: "https://source.unsplash.com/200x140/?mutton,legs" },
-      { name: "Mutton Brain", price: 225, img: "https://source.unsplash.com/200x140/?mutton,brain" },
-      { name: "Mutton Kidney", price: 270, img: "https://source.unsplash.com/200x140/?mutton,kidney" },
-      { name: "Mutton Liver", price: 250, img: "https://source.unsplash.com/200x140/?mutton,liver" },
-      { name: "Mutton Keema", price: 950, img: "https://source.unsplash.com/200x140/?mutton,keema" },
-      { name: "Mutton Boneless", price: 900, img: "https://source.unsplash.com/200x140/?mutton,boneless" },
-      { name: "Mutton Curry Cut", price: 800, img: "https://source.unsplash.com/200x140/?mutton,currycut" },
-      { name: "Raw Mutton", price: 800, img: "https://source.unsplash.com/200x140/?raw,mutton" }
-    ];
-
-    const cart = {};
+    const products = [...]; // Keep existing product array
+    const cart = JSON.parse(localStorage.getItem('cart') || '{}');
     const container = document.getElementById('product-list');
     const summaryDiv = document.getElementById('cart-summary');
+    const liveCart = document.getElementById('live-cart');
 
-    products.forEach((p, i) => {
-      const div = document.createElement('div');
-      div.className = 'card';
-      div.innerHTML = `
-        <img src="${p.img}" />
-        <p><strong>${p.name}</strong><br>₹${p.price}</p>
-        <div class="quantity-controls">
-          <button onclick="changeQty(${i}, -1)">-</button>
-          <span id="qty-${i}">0</span>
-          <button onclick="changeQty(${i}, 1)">+</button>
-        </div>
-      `;
-      container.appendChild(div);
-    });
+    function updateLiveCart() {
+      const total = Object.values(cart).reduce((sum, item) => sum + item.price * item.quantity, 0);
+      liveCart.innerText = `Cart: ₹${total}`;
+      localStorage.setItem('cart', JSON.stringify(cart));
+    }
+
+    function renderProducts() {
+      container.innerHTML = '';
+      products.forEach((p, i) => {
+        const div = document.createElement('div');
+        div.className = 'card';
+        div.innerHTML = `
+          <img src="${p.img}" />
+          <p><strong>${p.name}</strong><br>₹${p.price}</p>
+          <p class="subtotal" id="subtotal-${i}">Subtotal: ₹0</p>
+          <div class="quantity-controls">
+            <button onclick="changeQty(${i}, -1)">-</button>
+            <span id="qty-${i}">${cart[i]?.quantity || 0}</span>
+            <button onclick="changeQty(${i}, 1)">+</button>
+          </div>
+        `;
+        if (cart[i]) div.classList.add('selected');
+        container.appendChild(div);
+        document.getElementById(`subtotal-${i}`).innerText = cart[i] ? `Subtotal: ₹${cart[i].quantity * cart[i].price}` : 'Subtotal: ₹0';
+      });
+      updateLiveCart();
+    }
 
     function changeQty(index, delta) {
       if (!cart[index]) cart[index] = { ...products[index], quantity: 0 };
       cart[index].quantity += delta;
       if (cart[index].quantity <= 0) {
         delete cart[index];
-        document.getElementById(`qty-${index}`).innerText = 0;
-        document.getElementById(`qty-${index}`).closest('.card').classList.remove('selected');
-      } else {
-        document.getElementById(`qty-${index}`).innerText = cart[index].quantity;
-        document.getElementById(`qty-${index}`).closest('.card').classList.add('selected');
       }
+      renderProducts();
     }
 
-    function reviewOrder() {
-      if (Object.keys(cart).length === 0) {
-        alert("Please select at least one item to proceed.");
-        return;
-      }
-      document.querySelector('.products').style.display = 'none';
-      document.querySelector('.location-box').style.display = 'none';
-      let summary = '';
-      let total = 0;
-      for (let key in cart) {
-        const item = cart[key];
-        summary += `<p>${item.name} x ${item.quantity} - ₹${item.price * item.quantity}</p>`;
-        total += item.price * item.quantity;
-      }
-      summaryDiv.innerHTML = summary + `<hr><strong>Total: ₹${total}</strong>`;
-      document.getElementById('summary').style.display = 'block';
-    }
-
-    function goBackToProducts() {
-      document.getElementById('summary').style.display = 'none';
-      document.querySelector('.products').style.display = 'grid';
-      document.querySelector('.location-box').style.display = 'block';
-    }
-
-    function sendOrderToSheet() {
-      const phone = document.getElementById("phone").value.trim();
-      const location = document.getElementById("delivery-location").value;
-      if (!location) {
-        alert("Please select a delivery location.");
-        return;
-      }
-      if (!phone) {
-        alert("Please enter your phone number.");
-        return;
-      }
-      if (!/^[6-9]\d{9}$/.test(phone)) {
-        alert("Invalid phone number. Please enter a valid 10-digit Indian number.");
-        return;
-      }
-      document.getElementById('status').innerText = "Sending your order...";
-      navigator.geolocation.getCurrentPosition((position) => {
-        const items = Object.values(cart).map(p => `${p.name} x${p.quantity} (₹${p.price * p.quantity})`).join(", ");
-        const total = Object.values(cart).reduce((sum, p) => sum + p.price * p.quantity, 0);
-        const url = `https://docs.google.com/forms/d/e/1FAIpQLSec9RXfUL31tRAtkpPzO5FTgB-Mt7HTGVpDokS2nbT_A7tEzQ/formResponse?entry.1691012188=${encodeURIComponent(items)}&entry.2077435067=${position.coords.latitude},${position.coords.longitude}&entry.755137674=${encodeURIComponent(phone)}&entry.998775233=${encodeURIComponent(location)}&entry.282885649=${total}`;
-        fetch(url, { method: 'POST', mode: 'no-cors' });
-        document.getElementById('status').innerText = "Order sent! You’ll get a call soon.";
-        showPopup();
-      });
-    }
-
-    function showPopup() {
-      const popup = document.getElementById('popup');
-      popup.classList.add('show');
-      setTimeout(() => {
-        popup.classList.remove('show');
-        window.location.reload();
-      }, 3000);
-    }
+    window.onload = renderProducts;
   </script>
 </body>
 </html>
