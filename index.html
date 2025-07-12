@@ -184,13 +184,16 @@
     Tabletop.init({
       key: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQNn-pH_cNy6NLP-kl1wEQc5W72grhlbyqZSSijmQktIB0z2GPzOKfwWQIqUzDHl1cA_sP_8mMMQwjm/pubhtml?gid=0&single=true',
       callback: function(data) {
-        data.forEach(row => {
-          const index = parseInt(row.Index);
-          const stock = parseInt(row.Stock);
-          if (!isNaN(index) && !isNaN(stock)) stockMap[index] = stock;
-        });
-        renderProducts();
-      },
+  console.log('Fetched sheet data:', data); // ✅ Add this line
+  data.forEach(row => {
+    const index = parseInt(row.Index);
+    const stock = parseInt(row.Stock);
+    if (!isNaN(index) && !isNaN(stock)) stockMap[index] = stock;
+  });
+  console.log('Mapped stock data:', stockMap); // ✅ Add this line
+  renderProducts();
+}
+,
       simpleSheet: true
     });
   </script>
