@@ -82,6 +82,11 @@
       border-radius: 5px;
       cursor: pointer;
       font-size: 0.95em;
+      transition: transform 0.2s, background-color 0.3s;
+    }
+    button:hover {
+      transform: scale(1.05);
+      background-color: #6e1a1a;
     }
     .location-box {
       margin: 20px;
@@ -97,6 +102,23 @@
       margin-top: 10px;
       font-size: 0.9em;
       color: #214321;
+    }
+    .popup {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: #fff;
+      border: 2px solid #7d1c1c;
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      display: none;
+      z-index: 1000;
+      text-align: center;
+    }
+    .popup.show {
+      display: block;
     }
     @media (max-width: 480px) {
       .products {
@@ -119,6 +141,9 @@
   <div class="location-box">
     <button onclick="sendOrderToSheet()">📍 Send Order + Location</button>
     <p id="status"></p>
+  </div>
+  <div class="popup" id="popup">
+    <p><strong>✅ Your order was submitted successfully!</strong></p>
   </div>
   <script>
     const products = [
@@ -152,12 +177,22 @@
         alert("Geolocation not supported");
         return;
       }
+      document.getElementById('status').innerText = "Sending your order...";
       navigator.geolocation.getCurrentPosition((position) => {
         const items = cart.map(p => `${p.name} (₹${p.price})`).join(", ");
         const url = `https://docs.google.com/forms/d/e/1FAIpQLSec9RXfUL31tRAtkpPzO5FTgB-Mt7HTGVpDokS2nbT_A7tEzQ/formResponse?entry.1691012188=${encodeURIComponent(items)}&entry.2077435067=${position.coords.latitude},${position.coords.longitude}`;
         fetch(url, { method: 'POST', mode: 'no-cors' });
         document.getElementById('status').innerText = "Order sent! You’ll get a call soon.";
+        showPopup();
       });
+    }
+
+    function showPopup() {
+      const popup = document.getElementById('popup');
+      popup.classList.add('show');
+      setTimeout(() => {
+        popup.classList.remove('show');
+      }, 3000);
     }
   </script>
 </body>
