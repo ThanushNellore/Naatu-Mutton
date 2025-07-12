@@ -6,7 +6,6 @@
   <title>FreshMutton - ప్రేష్ మటన్</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
   <style>
-    /* styles unchanged */
     body {
       font-family: 'Roboto', sans-serif;
       margin: 0;
@@ -91,7 +90,6 @@
       font-size: 0.95em;
     }
     .subtotal {
-      margin-top: -5px;
       font-size: 0.85em;
       color: #444;
     }
@@ -214,45 +212,42 @@
       { name: "Raw Mutton", price: 800, img: "https://source.unsplash.com/200x140/?raw,mutton" }
     ];
 
-    const cart = JSON.parse(localStorage.getItem('cart') || '{}');
+    let cart = JSON.parse(localStorage.getItem('cart') || '{}');
     const container = document.getElementById('product-list');
     const summaryDiv = document.getElementById('cart-summary');
-    const liveCart = document.getElementById('live-cart');
+    const cartPreview = document.getElementById('live-cart');
 
-    function updateLiveCart() {
+    function updateCartPreview() {
       const total = Object.values(cart).reduce((sum, item) => sum + item.price * item.quantity, 0);
-      liveCart.innerText = `Cart: ₹${total}`;
-      localStorage.setItem('cart', JSON.stringify(cart));
+      cartPreview.innerText = `Cart: ₹${total}`;
     }
 
     function renderProducts() {
       container.innerHTML = '';
       products.forEach((p, i) => {
+        const qty = cart[i]?.quantity || 0;
         const div = document.createElement('div');
-        div.className = 'card';
+        div.className = 'card' + (qty > 0 ? ' selected' : '');
         div.innerHTML = `
           <img src="${p.img}" />
           <p><strong>${p.name}</strong><br>₹${p.price}</p>
-          <p class="subtotal" id="subtotal-${i}">Subtotal: ₹0</p>
+          <p class="subtotal" id="subtotal-${i}">${qty > 0 ? `Subtotal: ₹${qty * p.price}` : ''}</p>
           <div class="quantity-controls">
             <button onclick="changeQty(${i}, -1)">-</button>
-            <span id="qty-${i}">${cart[i]?.quantity || 0}</span>
+            <span id="qty-${i}">${qty}</span>
             <button onclick="changeQty(${i}, 1)">+</button>
           </div>
         `;
-        if (cart[i]) div.classList.add('selected');
         container.appendChild(div);
-        document.getElementById(`subtotal-${i}`).innerText = cart[i] ? `Subtotal: ₹${cart[i].quantity * cart[i].price}` : 'Subtotal: ₹0';
       });
-      updateLiveCart();
+      updateCartPreview();
+      localStorage.setItem('cart', JSON.stringify(cart));
     }
 
     function changeQty(index, delta) {
       if (!cart[index]) cart[index] = { ...products[index], quantity: 0 };
       cart[index].quantity += delta;
-      if (cart[index].quantity <= 0) {
-        delete cart[index];
-      }
+      if (cart[index].quantity <= 0) delete cart[index];
       renderProducts();
     }
 
@@ -264,7 +259,6 @@
       document.querySelector('.products').style.display = 'none';
       document.querySelector('.location-box').style.display = 'none';
       document.getElementById('summary').style.display = 'block';
-
       let summary = '';
       let total = 0;
       for (let key in cart) {
@@ -281,7 +275,34 @@
       document.querySelector('.location-box').style.display = 'block';
     }
 
-    window.onload = renderProducts;
+    function sendOrderToSheet() {
+      const phone = document.getElementById("phone").value.trim();
+      const location = document.getElementById("delivery-location").value;
+      if (!location || !/^[6-9]\d{9}$/.test(phone)) {
+        alert("Please enter valid delivery location and phone number.");
+        return;
+      }
+      document.getElementById('status').innerText = "Sending your order...";
+      navigator.geolocation.getCurrentPosition(position => {
+        const items = Object.values(cart).map(p => `${p.name} x${p.quantity} (₹${p.price * p.quantity})`).join(", ");
+        const total = Object.values(cart).reduce((sum, p) => sum + p.price * p.quantity, 0);
+        const url = `https://docs.google.com/forms/d/e/1FAIpQLSec9RXfUL31tRAtkpPzO5FTgB-Mt7HTGVpDokS2nbT_A7tEzQ/formResponse?entry.1691012188=${encodeURIComponent(items)}&entry.2077435067=${position.coords.latitude},${position.coords.longitude}&entry.755137674=${encodeURIComponent(phone)}&entry.998775233=${encodeURIComponent(location)}&entry.282885649=${total}`;
+        fetch(url, { method: 'POST', mode: 'no-cors' });
+        document.getElementById('status').innerText = "Order sent! You’ll get a call soon.";
+        showPopup();
+      });
+    }
+
+    function showPopup() {
+      document.getElementById('popup').classList.add('show');
+      setTimeout(() => {
+        document.getElementById('popup').classList.remove('show');
+        localStorage.removeItem('cart');
+        window.location.reload();
+      }, 3000);
+    }
+
+    renderProducts();
   </script>
 </body>
 </html>
