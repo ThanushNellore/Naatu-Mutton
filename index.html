@@ -206,13 +206,17 @@
     }
 
     function sendOrderToSheet() {
-      if (!navigator.geolocation) {
-        alert("Geolocation not supported");
-        return;
-      }
-      const phone = document.getElementById("phone").value;
+      const phone = document.getElementById("phone").value.trim();
       if (!phone) {
         alert("Please enter your phone number.");
+        return;
+      }
+      if (!/^\d{10}$/.test(phone)) {
+        alert("Invalid phone number. Please enter a 10-digit number.");
+        return;
+      }
+      if (!navigator.geolocation) {
+        alert("Geolocation not supported");
         return;
       }
       document.getElementById('status').innerText = "Sending your order...";
@@ -230,6 +234,7 @@
       popup.classList.add('show');
       setTimeout(() => {
         popup.classList.remove('show');
+        window.location.reload();
       }, 3000);
     }
   </script>
