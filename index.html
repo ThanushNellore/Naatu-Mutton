@@ -60,7 +60,7 @@
     }
     .products {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
       gap: 15px;
       padding: 20px;
     }
@@ -75,11 +75,7 @@
       position: relative;
     }
     .card:hover {
-      transform: scale(1.02);
-    }
-    .card.selected {
-      border: 2px solid #7d1c1c;
-      background-color: #ffeeee;
+      transform: scale(1.03);
     }
     .card.out-of-stock {
       background-color: #ffe5e5;
@@ -88,75 +84,32 @@
     }
     .card img {
       width: 100%;
-      height: 140px;
+      height: 120px;
       object-fit: cover;
     }
     .card p {
       margin: 10px;
-      font-size: 1em;
+      font-size: 0.95em;
     }
     .quantity-controls {
       display: flex;
       justify-content: center;
-      align-items: center;
       gap: 10px;
-      padding-bottom: 15px;
+      align-items: center;
+      margin-bottom: 10px;
     }
     .quantity-controls button {
+      padding: 5px 10px;
+      font-size: 1em;
       background-color: #7d1c1c;
       color: white;
-      padding: 5px 10px;
       border: none;
-      border-radius: 5px;
-      font-size: 1em;
+      border-radius: 4px;
       cursor: pointer;
     }
-    .location-box {
-      text-align: center;
-      margin: 20px;
-    }
-    .location-box button {
-      background-color: #5b1313;
-      color: white;
-      padding: 12px 30px;
-      border: none;
-      font-size: 1em;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-    .summary-page {
-      display: none;
-      padding: 20px;
-      text-align: center;
-    }
-    .summary-page input, .summary-page select {
-      padding: 10px;
-      width: 90%;
-      max-width: 400px;
-      margin: 10px auto;
-      display: block;
-      border: 1px solid #ccc;
-      border-radius: 5px;
-    }
-    #status {
-      color: green;
-      font-weight: bold;
-      margin-top: 10px;
-    }
-    .popup {
-      display: none;
-      position: fixed;
-      bottom: 30px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: #d4edda;
-      color: #155724;
-      padding: 15px 30px;
-      border-radius: 10px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
-    }
-    .popup.show {
-      display: block;
+    .quantity-controls span {
+      min-width: 20px;
+      display: inline-block;
     }
   </style>
 </head>
@@ -166,36 +119,9 @@
     <h1>FreshMutton<br>ప్రేష్ మటన్</h1>
     <div class="cart-preview" id="live-cart">Cart: ₹0</div>
   </header>
-
   <div class="hero">Fresh Naatu Mutton Delivered to Your Doorstep</div>
   <div class="notice-box">🎉 Order now and enjoy our best quality cuts every Sunday morning!</div>
   <div class="products" id="product-list"></div>
-
-  <div class="location-box">
-    <button onclick="reviewOrder()">Next</button>
-  </div>
-
-  <div class="summary-page" id="summary">
-    <h3>Order Summary</h3>
-    <div id="cart-summary"></div>
-    <input type="text" id="customer-name" placeholder="Enter your name" required />
-    <select id="delivery-location">
-      <option value="">Select Delivery Location</option>
-      <option value="Nellore">Nellore</option>
-      <option value="Kavali">Kavali</option>
-      <option value="Buchi">Buchi</option>
-    </select>
-    <input type="text" id="phone" placeholder="Enter your phone number" required />
-    <div class="location-box">
-      <button onclick="sendOrderToSheet()">📍 Submit Order with Location</button>
-      <button onclick="goBackToProducts()">🔙 Back</button>
-      <p id="status"></p>
-    </div>
-  </div>
-
-  <div class="popup" id="popup">
-    <p><strong>✅ Your order was submitted successfully!</strong></p>
-  </div>
 
   <script>
     const stockMap = {};
@@ -214,7 +140,6 @@
     let cart = {};
     const container = document.getElementById('product-list');
     const cartPreview = document.getElementById('live-cart');
-    const summaryDiv = document.getElementById('cart-summary');
 
     function updateCartPreview() {
       const total = Object.values(cart).reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -243,70 +168,17 @@
         div.innerHTML = `
           <img src="${p.img}" />
           <p><strong>${p.name}</strong><br>₹${p.price}</p>
-          <p>${qty > 0 ? `Subtotal: ₹${qty * p.price}` : (isOut ? 'Out of stock' : '')}</p>
+          <p class="subtotal" id="subtotal-${i}">${qty > 0 ? `Subtotal: ₹${qty * p.price}` : (isOut ? 'Out of stock' : '')}</p>
           ${oneLeft ? '<p style="color:red;font-weight:bold;">Only 1 left!</p>' : ''}
           <div class="quantity-controls">
             <button onclick="changeQty(${i}, -1)">-</button>
-            <span>${qty}</span>
+            <span id="qty-${i}">${qty}</span>
             <button onclick="changeQty(${i}, 1)" ${qty >= stock ? 'disabled' : ''}>+</button>
           </div>
         `;
         container.appendChild(div);
       });
       updateCartPreview();
-    }
-
-    function reviewOrder() {
-      if (Object.keys(cart).length === 0) return alert("Please select at least one item to proceed.");
-      document.querySelector('.products').style.display = 'none';
-      document.querySelector('.location-box').style.display = 'none';
-      document.getElementById('summary').style.display = 'block';
-
-      let summary = '', total = 0;
-      for (let key in cart) {
-        const item = cart[key];
-        summary += `<p>${item.name} x ${item.quantity} - ₹${item.price * item.quantity}</p>`;
-        total += item.price * item.quantity;
-      }
-      summaryDiv.innerHTML = summary + `<hr><strong>Total: ₹${total}</strong>`;
-    }
-
-    function goBackToProducts() {
-      document.getElementById('summary').style.display = 'none';
-      document.querySelector('.products').style.display = 'grid';
-      document.querySelector('.location-box').style.display = 'block';
-    }
-
-    function sendOrderToSheet() {
-      const name = document.getElementById("customer-name").value.trim();
-      const phone = document.getElementById("phone").value.trim();
-      const location = document.getElementById("delivery-location").value;
-
-      if (!name || !location || !/^[6-9]\d{9}$/.test(phone)) {
-        alert("Please enter valid name, delivery location, and phone number.");
-        return;
-      }
-
-      document.getElementById('status').innerText = "Sending your order...";
-      navigator.geolocation.getCurrentPosition(position => {
-        const items = Object.values(cart).map(p => `${p.name} x${p.quantity} (₹${p.price * p.quantity})`).join(", ");
-        const total = Object.values(cart).reduce((sum, p) => sum + p.price * p.quantity, 0);
-
-        const url = `https://docs.google.com/forms/d/e/1FAIpQLSec9RXfUL31tRAtkpPzO5FTgB-Mt7HTGVpDokS2nbT_A7tEzQ/formResponse?entry.1691012188=${encodeURIComponent(items)}&entry.2077435067=${position.coords.latitude},${position.coords.longitude}&entry.755137674=${encodeURIComponent(phone)}&entry.998775233=${encodeURIComponent(location)}&entry.282885649=${total}&entry.1154944666=${encodeURIComponent(name)}`;
-
-        fetch(url, { method: 'POST', mode: 'no-cors' });
-        document.getElementById('status').innerText = "Order sent! You’ll get a call soon.";
-        showPopup();
-      });
-    }
-
-    function showPopup() {
-      document.getElementById('popup').classList.add('show');
-      setTimeout(() => {
-        document.getElementById('popup').classList.remove('show');
-        cart = {};
-        window.location.reload();
-      }, 3000);
     }
 
     Tabletop.init({
