@@ -77,15 +77,17 @@
       margin: 10px;
       font-size: 0.95em;
     }
-    .quantity {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      background: #7d1c1c;
-      color: white;
-      border-radius: 50%;
+    .quantity-controls {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .quantity-controls button {
+      width: auto;
       padding: 5px 10px;
-      font-size: 0.9em;
+      font-size: 1em;
     }
     button {
       background-color: #561313;
@@ -174,6 +176,7 @@
     <input type="text" id="phone" placeholder="Enter your phone number" required />
     <div class="location-box">
       <button onclick="sendOrderToSheet()">📍 Submit Order with Location</button>
+      <button onclick="goBackToProducts()">🔙 Back</button>
       <p id="status"></p>
     </div>
   </div>
@@ -200,20 +203,29 @@
     products.forEach((p, i) => {
       const div = document.createElement('div');
       div.className = 'card';
-      div.innerHTML = `<img src="${p.img}" /><p><strong>${p.name}</strong><br>₹${p.price}</p><span class="quantity" id="qty-${i}" style="display:none">1</span><button onclick="addToCart(this, ${i})">Add to Cart</button>`;
+      div.innerHTML = `
+        <img src="${p.img}" />
+        <p><strong>${p.name}</strong><br>₹${p.price}</p>
+        <div class="quantity-controls">
+          <button onclick="changeQty(${i}, -1)">-</button>
+          <span id="qty-${i}">0</span>
+          <button onclick="changeQty(${i}, 1)">+</button>
+        </div>
+      `;
       container.appendChild(div);
     });
 
-    function addToCart(button, index) {
-      if (!cart[index]) {
-        cart[index] = { ...products[index], quantity: 1 };
+    function changeQty(index, delta) {
+      if (!cart[index]) cart[index] = { ...products[index], quantity: 0 };
+      cart[index].quantity += delta;
+      if (cart[index].quantity <= 0) {
+        delete cart[index];
+        document.getElementById(`qty-${index}`).innerText = 0;
+        document.getElementById(`qty-${index}`).closest('.card').classList.remove('selected');
       } else {
-        cart[index].quantity++;
+        document.getElementById(`qty-${index}`).innerText = cart[index].quantity;
+        document.getElementById(`qty-${index}`).closest('.card').classList.add('selected');
       }
-      const qtySpan = document.getElementById(`qty-${index}`);
-      qtySpan.innerText = cart[index].quantity;
-      qtySpan.style.display = 'inline';
-      button.closest('.card').classList.add('selected');
     }
 
     function reviewOrder() {
@@ -232,6 +244,12 @@
       }
       summaryDiv.innerHTML = summary + `<hr><strong>Total: ₹${total}</strong>`;
       document.getElementById('summary').style.display = 'block';
+    }
+
+    function goBackToProducts() {
+      document.getElementById('summary').style.display = 'none';
+      document.querySelector('.products').style.display = 'grid';
+      document.querySelector('.location-box').style.display = 'block';
     }
 
     function sendOrderToSheet() {
