@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>FreshMutton - ప్రేష్ మటన్</title>
   <link href="https://fonts.googleapis.com/css2?family=Roboto&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/tabletop@1.6.4/tabletop.min.js"></script>
   <style>
     body {
       font-family: 'Roboto', sans-serif;
@@ -72,6 +73,7 @@
       border: 1px solid #e0e0e0;
       transition: transform 0.2s;
       position: relative;
+      opacity: 1;
     }
     .card:hover {
       transform: scale(1.03);
@@ -79,6 +81,11 @@
     .card.selected {
       border: 2px solid #7d1c1c;
       background-color: #ffeeee;
+    }
+    .card.out-of-stock {
+      background-color: #ffe5e5;
+      pointer-events: none;
+      opacity: 0.6;
     }
     .card img {
       width: 100%;
@@ -183,6 +190,7 @@
   <div class="summary-page" id="summary">
     <h3>Order Summary</h3>
     <div id="cart-summary"></div>
+    <input type="text" id="customer-name" placeholder="Enter your name" required />
     <select id="delivery-location">
       <option value="">Select Delivery Location</option>
       <option value="Nellore">Nellore</option>
@@ -200,7 +208,7 @@
     <p><strong>✅ Your order was submitted successfully!</strong></p>
   </div>
   <script>
-    const EXPIRY_HOURS = 3;
+    const stockMap = {};
     const products = [
       { name: "Mutton Boti", price: 300, img: "https://source.unsplash.com/200x140/?mutton,boti" },
       { name: "Mutton Legs (Paya)", price: 225, img: "https://source.unsplash.com/200x140/?mutton,legs" },
@@ -213,70 +221,61 @@
       { name: "Raw Mutton", price: 800, img: "https://source.unsplash.com/200x140/?raw,mutton" }
     ];
 
-    let stored = JSON.parse(localStorage.getItem('cartState') || '{}');
-    let cart = stored.data || {};
-
-    // Check expiry
-    if (stored.timestamp && Date.now() - stored.timestamp > EXPIRY_HOURS * 60 * 60 * 1000) {
-      cart = {};
-      localStorage.removeItem('cartState');
-    }
-
+    let cart = {};
     const container = document.getElementById('product-list');
-    const summaryDiv = document.getElementById('cart-summary');
     const cartPreview = document.getElementById('live-cart');
+    const summaryDiv = document.getElementById('cart-summary');
 
     function updateCartPreview() {
       const total = Object.values(cart).reduce((sum, item) => sum + item.price * item.quantity, 0);
       cartPreview.innerText = `Cart: ₹${total}`;
     }
 
-    function saveCart() {
-      localStorage.setItem('cartState', JSON.stringify({
-        data: cart,
-        timestamp: Date.now()
-      }));
+    function changeQty(index, delta) {
+      if (!cart[index]) cart[index] = { ...products[index], quantity: 0 };
+      if ((cart[index].quantity + delta) <= stockMap[index]) {
+        cart[index].quantity += delta;
+        if (cart[index].quantity <= 0) delete cart[index];
+        renderProducts();
+      }
     }
 
     function renderProducts() {
       container.innerHTML = '';
       products.forEach((p, i) => {
+        const stock = stockMap[i] || 0;
         const qty = cart[i]?.quantity || 0;
+        const isOut = stock === 0;
+        const oneLeft = stock - qty === 1;
+
         const div = document.createElement('div');
-        div.className = 'card' + (qty > 0 ? ' selected' : '');
+        div.className = 'card' + (qty > 0 ? ' selected' : '') + (isOut ? ' out-of-stock' : '');
         div.innerHTML = `
           <img src="${p.img}" />
           <p><strong>${p.name}</strong><br>₹${p.price}</p>
-          <p class="subtotal" id="subtotal-${i}">${qty > 0 ? `Subtotal: ₹${qty * p.price}` : ''}</p>
+          <p class="subtotal" id="subtotal-${i}">${qty > 0 ? `Subtotal: ₹${qty * p.price}` : (isOut ? 'Out of stock' : '')}</p>
+          ${oneLeft ? '<p style="color:red;font-weight:bold;">Only 1 left!</p>' : ''}
           <div class="quantity-controls">
             <button onclick="changeQty(${i}, -1)">-</button>
             <span id="qty-${i}">${qty}</span>
-            <button onclick="changeQty(${i}, 1)">+</button>
+            <button onclick="changeQty(${i}, 1)" ${qty >= stock ? 'disabled' : ''}>+</button>
           </div>
         `;
         container.appendChild(div);
       });
       updateCartPreview();
-      saveCart();
-    }
-
-    function changeQty(index, delta) {
-      if (!cart[index]) cart[index] = { ...products[index], quantity: 0 };
-      cart[index].quantity += delta;
-      if (cart[index].quantity <= 0) delete cart[index];
-      renderProducts();
     }
 
     function reviewOrder() {
-      if (Object.keys(cart).length === 0) {
-        alert("Please select at least one item to proceed.");
-        return;
-      }
+      const name = document.getElementById("customer-name").value.trim();
+      if (!name) return alert("Please enter your name.");
+      if (Object.keys(cart).length === 0) return alert("Please select at least one item to proceed.");
+
       document.querySelector('.products').style.display = 'none';
       document.querySelector('.location-box').style.display = 'none';
       document.getElementById('summary').style.display = 'block';
-      let summary = '';
-      let total = 0;
+
+      let summary = '', total = 0;
       for (let key in cart) {
         const item = cart[key];
         summary += `<p>${item.name} x ${item.quantity} - ₹${item.price * item.quantity}</p>`;
@@ -292,17 +291,22 @@
     }
 
     function sendOrderToSheet() {
+      const name = document.getElementById("customer-name").value.trim();
       const phone = document.getElementById("phone").value.trim();
       const location = document.getElementById("delivery-location").value;
-      if (!location || !/^[6-9]\d{9}$/.test(phone)) {
-        alert("Please enter valid delivery location and phone number.");
+
+      if (!name || !location || !/^[6-9]\d{9}$/.test(phone)) {
+        alert("Please enter valid name, delivery location, and phone number.");
         return;
       }
+
       document.getElementById('status').innerText = "Sending your order...";
       navigator.geolocation.getCurrentPosition(position => {
         const items = Object.values(cart).map(p => `${p.name} x${p.quantity} (₹${p.price * p.quantity})`).join(", ");
         const total = Object.values(cart).reduce((sum, p) => sum + p.price * p.quantity, 0);
-        const url = `https://docs.google.com/forms/d/e/1FAIpQLSec9RXfUL31tRAtkpPzO5FTgB-Mt7HTGVpDokS2nbT_A7tEzQ/formResponse?entry.1691012188=${encodeURIComponent(items)}&entry.2077435067=${position.coords.latitude},${position.coords.longitude}&entry.755137674=${encodeURIComponent(phone)}&entry.998775233=${encodeURIComponent(location)}&entry.282885649=${total}`;
+
+        const url = `https://docs.google.com/forms/d/e/1FAIpQLSec9RXfUL31tRAtkpPzO5FTgB-Mt7HTGVpDokS2nbT_A7tEzQ/formResponse?entry.1691012188=${encodeURIComponent(items)}&entry.2077435067=${position.coords.latitude},${position.coords.longitude}&entry.755137674=${encodeURIComponent(phone)}&entry.998775233=${encodeURIComponent(location)}&entry.282885649=${total}&entry.1154944666=${encodeURIComponent(name)}`;
+
         fetch(url, { method: 'POST', mode: 'no-cors' });
         document.getElementById('status').innerText = "Order sent! You’ll get a call soon.";
         showPopup();
@@ -313,12 +317,23 @@
       document.getElementById('popup').classList.add('show');
       setTimeout(() => {
         document.getElementById('popup').classList.remove('show');
-        localStorage.removeItem('cartState');
+        cart = {};
         window.location.reload();
       }, 3000);
     }
 
-    renderProducts();
+    Tabletop.init({
+      key: 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQNn-pH_cNy6NLP-kl1wEQc5W72grhlbyqZSSijmQktIB0z2GPzOKfwWQIqUzDHl1cA_sP_8mMMQwjm/pubhtml?gid=0&single=true', // Replace with actual
+      callback: function(data) {
+        data.forEach(row => {
+          const index = parseInt(row.Index);
+          const stock = parseInt(row.Stock);
+          if (!isNaN(index) && !isNaN(stock)) stockMap[index] = stock;
+        });
+        renderProducts();
+      },
+      simpleSheet: true
+    });
   </script>
 </body>
 </html>
