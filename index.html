@@ -200,6 +200,7 @@
     <p><strong>✅ Your order was submitted successfully!</strong></p>
   </div>
   <script>
+    const EXPIRY_HOURS = 3;
     const products = [
       { name: "Mutton Boti", price: 300, img: "https://source.unsplash.com/200x140/?mutton,boti" },
       { name: "Mutton Legs (Paya)", price: 225, img: "https://source.unsplash.com/200x140/?mutton,legs" },
@@ -212,7 +213,15 @@
       { name: "Raw Mutton", price: 800, img: "https://source.unsplash.com/200x140/?raw,mutton" }
     ];
 
-    let cart = JSON.parse(localStorage.getItem('cart') || '{}');
+    let stored = JSON.parse(localStorage.getItem('cartState') || '{}');
+    let cart = stored.data || {};
+
+    // Check expiry
+    if (stored.timestamp && Date.now() - stored.timestamp > EXPIRY_HOURS * 60 * 60 * 1000) {
+      cart = {};
+      localStorage.removeItem('cartState');
+    }
+
     const container = document.getElementById('product-list');
     const summaryDiv = document.getElementById('cart-summary');
     const cartPreview = document.getElementById('live-cart');
@@ -220,6 +229,13 @@
     function updateCartPreview() {
       const total = Object.values(cart).reduce((sum, item) => sum + item.price * item.quantity, 0);
       cartPreview.innerText = `Cart: ₹${total}`;
+    }
+
+    function saveCart() {
+      localStorage.setItem('cartState', JSON.stringify({
+        data: cart,
+        timestamp: Date.now()
+      }));
     }
 
     function renderProducts() {
@@ -241,7 +257,7 @@
         container.appendChild(div);
       });
       updateCartPreview();
-      localStorage.setItem('cart', JSON.stringify(cart));
+      saveCart();
     }
 
     function changeQty(index, delta) {
@@ -297,7 +313,7 @@
       document.getElementById('popup').classList.add('show');
       setTimeout(() => {
         document.getElementById('popup').classList.remove('show');
-        localStorage.removeItem('cart');
+        localStorage.removeItem('cartState');
         window.location.reload();
       }, 3000);
     }
